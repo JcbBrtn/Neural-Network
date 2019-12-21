@@ -6,7 +6,6 @@ import numpy as np
 Neural network class:
 
 TODO List:
-    Add biases into each neuron before sent into activation function
     Add back prop
     Play around with mutating learning rate
 """
@@ -19,8 +18,10 @@ class neuralNetwork:
         self.out = out
         #masses are the multipliers of each neuron layer
         self.masses = []
+        self.biases = []
         #weights are the multiplied and summed inputs along each layer
         self.weights = []
+        self.sigPrime = []
         #Learning rate in this case is the highest percentage a mass can change during mutation
         #This will remain constant through families
         self.learningRate = random.random()
@@ -32,11 +33,11 @@ class neuralNetwork:
         y = the neuron number you are going to
         z = the neuron number you are coming from
 
-    Masses are going to filled randomly with numbers between -1 and 1 2 to start
-    No biases are added between layers
-    No sigmoid functions
+    Masses are going to filled randomly with numbers between -10 and 10 to start
+    Biases are filled between -20 and 20 to start
     just a bare bone neural network.
         """
+        self.fillBiases()
         for x in range(3):
             self.fillMasses(x)
 
@@ -59,21 +60,38 @@ class neuralNetwork:
             massGoTo.append(massCome)
         self.masses.append(massGoTo)
 
+    def fillBiases(self):
+        for layers in range(2):
+            biases = []
+            for bias in range(10):
+                biases.append(random.randint(-20, 20))
+            self.biases.append(biases)
+        biases = []
+        for i in range(self.out):
+            biases.append(random.randint(-20,20))
+        self.biases.append(biases)
+
     def run(self, inpArr):
         #Sums product of weights and masses through the Neural Network
 
         self.weights.append(inpArr)
-        for mx, wx in zip(self.masses, self.weights):
+        for mx, wx, bx in zip(self.masses, self.weights, self.biases):
             weight = []
-            for my in mx:
-                total = 0
+            z = []
+            for my, by in zip(mx, bx):
+                total = by
                 for mz, wy in zip(my, wx):
                     total += (mz*wy)
                 weight.append(self.sigmoid(total))
+                z.append(self.sigmaPrime(total))
             self.weights.append(weight)
+            self.sigPrime.append(z)
             
     def sigmoid(self, x):
         return round((1/(1+ np.exp(-1*x))), 4)
+
+    def sigmaPrime(self,x):
+        return self.sigmoid(x) * (1 - self.sigmoid(x))
 
     def getOutput(self):
         return self.weights[3]
@@ -83,6 +101,7 @@ class neuralNetwork:
         child = neuralNetwork(self.inp, self.out)
         child.masses = self.masses
         child.learningRate = self.learningRate
+        clild.biases = self.biases
         
         #for each mass, bump it up or down determined by the learning rate
         #TODO, play around with mutating the learning Rate
@@ -92,4 +111,12 @@ class neuralNetwork:
                     mutationRate = random.uniform(-1* child.learningRate, child.learningRate)
                     child.masses[mx][my][mz] += mutationRate
 
+        for bx in range(len(child.biases)):
+            for by in range(len(child.biases[bx])):
+                mutationRate = random.uniform(-1* child.learningRate, child.learningRate)
+                child.biases[bx][by] += mutationRate
+
         return child
+
+    def backPropagation(self, desiredOut):
+        return
