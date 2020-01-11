@@ -1,122 +1,113 @@
 import random
-import math
-import numpy as np
+import Neuron
 
-"""
-Neural network class:
-
-TODO List:
-    Add back prop
-    Play around with mutating learning rate
-"""
-
-class neuralNetwork:
-    #2 layer neural network, 10 neurons per layer
-    #Initilized with the number of inputs to be expecting and the number of outputs to be expecting
-    def __init__(self, inp, out):
-        self.inp = inp
-        self.out = out
-        #masses are the multipliers of each neuron layer
-        self.masses = []
-        self.biases = []
-        #weights are the multiplied and summed inputs along each layer
-        self.weights = []
-        self.sigPrime = []
-        #Learning rate in this case is the highest percentage a mass can change during mutation
-        #This will remain constant through families
+class NeuralNetwork:
+    def __init__(self):
+        self.neuronCounter = 1
+        #network[0] is the input layer
+        #network[-1] is the output layer
+        self.network = [[],[],[]]
+        self.neurons = []
         self.learningRate = random.random()
-        """
-    Masses are to be initilized as such:
 
-        M_x_y_z where,
-        x = the neuron layer you are in
-        y = the neuron number you are going to
-        z = the neuron number you are coming from
-
-    Masses are going to filled randomly with numbers between -10 and 10 to start
-    Biases are filled between -20 and 20 to start
-    just a bare bone neural network.
-        """
-        self.fillBiases()
-        for x in range(3):
-            self.fillMasses(x)
-
-    def fillMasses(self, layer):
-        #Fills the masses array with random values between -1 and 1.
-        #Place Holder/Starter for optimization
-        if layer == 0:
-            comeFrom = self.inp
-            goTo = 10
-        elif layer == 1:
-            comeFrom = goTo = 10
-        else:
-            comeFrom = 10
-            goTo = self.out
-        massGoTo = []
-        for y in range(goTo):
-            massCome = []
-            for z in range(comeFrom):
-                massCome.append(random.uniform(-10,10))
-            massGoTo.append(massCome)
-        self.masses.append(massGoTo)
-
-    def fillBiases(self):
-        for layers in range(2):
-            biases = []
-            for bias in range(10):
-                biases.append(random.randint(-20, 20))
-            self.biases.append(biases)
-        biases = []
-        for i in range(self.out):
-            biases.append(random.randint(-20,20))
-        self.biases.append(biases)
+        #Start the neural Network with 1 input linked to 1 output
+        self.addNeuron(0)
+        print(self.neuronCounter)
+        self.addNeuron(2)
+        print(self.neuronCounter)
+        self.link(1,2)
 
     def run(self, inpArr):
-        #Sums product of weights and masses through the Neural Network
+        for layer in self.network:        
+            for count, neuron in enumerate(layer):
+                #get and update inputs to each neuron before firing that neuron
+                inputs = {}
+                for inpNum in neuron.getInputNums():
+                    if inpNum == 0:
+                        inp = inpArr[count]
+                    else:
+                        inp = self.neurons[inpNum - 1].getOutput(neuron.num)
 
-        self.weights.append(inpArr)
-        for mx, wx, bx in zip(self.masses, self.weights, self.biases):
-            weight = []
-            z = []
-            for my, by in zip(mx, bx):
-                total = by
-                for mz, wy in zip(my, wx):
-                    total += (mz*wy)
-                weight.append(self.sigmoid(total))
-                z.append(self.sigmaPrime(total))
-            self.weights.append(weight)
-            self.sigPrime.append(z)
+                    inputs.setdefault(inpNum, inp)
+                neuron.updateInpDic(inputs)
+                neuron.run()
+                self.neurons[neuron.num - 1] = neuron
+
+        self.updateNetwork()
+        return self.getOutputs()
+
+    def updateNetwork(self):
+        for layerNum in range(len(self.network)):
+            for neuronNum in range(len(self.network[layerNum])):
+                self.network[layerNum][neuronNum] = self.neurons[self.network[layerNum][neuronNum].num - 1]
+        return self.network
+    
+    def getOutputs(self):
+        output = []
+        for neuron in self.network[-1]:
+            output.append(neuron.getOutput(0))
+        return output
+
+    def addNeuron(self, layerNum):
+        if layerNum == 0:
+            self.neurons.append(Neuron.Neuron(self.neuronCounter,[0],[]))
+        elif layerNum == 1:
+            self.neurons.append(Neuron.Neuron(self.neuronCounter,[],[]))
+        else:
+            self.neurons.append(Neuron.Neuron(self.neuronCounter,[],[0]))
             
-    def sigmoid(self, x):
-        return round((1/(1+ np.exp(-1*x))), 4)
+        self.network[layerNum].append(self.neurons[self.neuronCounter - 1])
+        self.neuronCounter += 1
+        return self.updateNetwork()
 
-    def sigmaPrime(self,x):
-        return self.sigmoid(x) * (1 - self.sigmoid(x))
+    def link(self, beginNum, endNum):
+        self.neurons[beginNum - 1].addOutput(endNum)
+        self.neurons[endNum - 1].addInput(beginNum)
+        return self.updateNetwork()
 
-    def getOutput(self):
-        return self.weights[3]
-
+    def cut(self, beginNum, endNum):
+        self.neurons[beginNum - 1].popOut(endNum)
+        self.neurons[endNum - 1].popOut(beginNum)
+        return self.updateNetwork()
+                
     def mutate(self):
-        #Create a child for the Neural Network and bump masses around 
-        child = neuralNetwork(self.inp, self.out)
-        child.masses = self.masses
-        child.learningRate = self.learningRate
-        clild.biases = self.biases
-        
-        #for each mass, bump it up or down determined by the learning rate
-        #TODO, play around with mutating the learning Rate
-        for mx in range(len(child.masses)):
-            for my in range(len(child.masses[mx])):
-                for mz in range(len(child.masses[mx][my])):
-                    mutationRate = random.uniform(-1* child.learningRate, child.learningRate)
-                    child.masses[mx][my][mz] += mutationRate
+        """
+        goes through each neuron, each neuron has a chance of mutating
+        equal to the learning rate of the network.
+        There is a 20% chance of a physical mutation.
+        A physical mutation is:
+            Adding a neuron
+                Can add to input, hidden or Output layer, determined randomly
+            Linking a neuron
+                links are determined randomly, any neuron can link to anyother neuron
+            Cutting a neuron link
+                Cuts are determined randomly
+        """
+        #First, mutate masses
+        for neuronNum in range(self.neuronCounter - 1):
+            if self.learningRate > random.random():
+                self.neurons[neuronNum].mutate()
+            else:
+                continue
 
-        for bx in range(len(child.biases)):
-            for by in range(len(child.biases[bx])):
-                mutationRate = random.uniform(-1* child.learningRate, child.learningRate)
-                child.biases[bx][by] += mutationRate
+        #Now determine physical mutations
+        if random.random() < 0.2:
+            try:
+                physMutation = random.choice(['a','l','c'])
+                if physMutation == 'a':
+                    self.addNeuron(random.choice([0,1,2]))
+                elif physMutation == 'l':
+                    begin = random.randint(1,self.neuronCounter - 1)
+                    end = random.randint(1, self.neuronCounter - 1)
+                    self.link(begin, end)
+                else:
+                    begin = random.randint(1,self.neuronCounter - 1)
+                    end = random.choice(self.neurons[begin].outDic.keys())
+                    self.cut(begin, end)
+            except:
+                return self
+        return self
 
-        return child
 
-    def backPropagation(self, desiredOut):
-        return
+
+
